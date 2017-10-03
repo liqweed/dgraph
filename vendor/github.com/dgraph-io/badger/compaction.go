@@ -41,8 +41,8 @@ func (r keyRange) String() string {
 }
 
 func (r keyRange) equals(dst keyRange) bool {
-	return bytes.Compare(r.left, dst.left) == 0 &&
-		bytes.Compare(r.right, dst.right) == 0 &&
+	return bytes.Equal(r.left, dst.left) &&
+		bytes.Equal(r.right, dst.right) &&
 		r.inf == dst.inf
 }
 

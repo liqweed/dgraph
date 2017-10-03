@@ -51,7 +51,7 @@ func (s *levelHandler) getSummary(sum *summary) {
 	}
 }
 
-func (s *KV) validate() { s.lc.validate() }
+func (s *KV) validate() error { return s.lc.validate() }
 
 func (s *levelsController) validate() error {
 	for _, l := range s.levels {
@@ -78,7 +78,7 @@ func (s *levelHandler) validate() error {
 
 		if bytes.Compare(s.tables[j-1].Biggest(), s.tables[j].Smallest()) >= 0 {
 			return errors.Errorf(
-				"Inter: %s vs %s: level=%d j=%d numTables=%d",
+				"Inter: %q vs %q: level=%d j=%d numTables=%d",
 				string(s.tables[j-1].Biggest()), string(s.tables[j].Smallest()), s.level, j, numTables)
 		}
 
