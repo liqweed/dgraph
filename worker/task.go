@@ -1406,7 +1406,8 @@ func (cp *countParams) evaluate(out *protos.Result) {
 	itOpt := badger.DefaultIteratorOptions
 	itOpt.PrefetchValues = false
 	itOpt.Reverse = cp.fn == "le" || cp.fn == "lt"
-	it := pstore.NewIterator(itOpt)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(itOpt)
 	defer it.Close()
 	pk := x.ParsedKey{
 		Attr: cp.attr,

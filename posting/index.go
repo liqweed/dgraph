@@ -383,32 +383,29 @@ func (l *List) AddMutationWithIndex(ctx context.Context, t *protos.DirectedEdge)
 func deleteEntries(prefix []byte) error {
 	iterOpt := badger.DefaultIteratorOptions
 	iterOpt.PrefetchValues = false
-	idxIt := pstore.NewIterator(iterOpt)
+	txn := pstore.NewTransaction(false)
+	txn1 := pstore.NewTransaction(false)
+	idxIt := txn.NewIterator(iterOpt)
 	defer idxIt.Close()
 
-	wb := make([]*badger.Entry, 0, 100)
 	var batchSize int
 	for idxIt.Seek(prefix); idxIt.ValidForPrefix(prefix); idxIt.Next() {
 		key := idxIt.Item().Key()
 		data := make([]byte, len(key))
 		copy(data, key)
 		batchSize += len(key)
-		wb = badger.EntriesDelete(wb, data)
+		err := txn1.Delete(data)
+		x.Check(err)
 
 		if batchSize >= maxBatchSize {
-			if err := pstore.BatchSet(wb); err != nil {
+			if err := txn.Commit(nil); err != nil {
 				return err
 			}
-			wb = wb[:0]
+			txn1 = pstore.NewTransaction(true)
 			batchSize = 0
 		}
 	}
-	if len(wb) > 0 {
-		if err := pstore.BatchSet(wb); err != nil {
-			return err
-		}
-	}
-	return nil
+	return txn.Commit(nil)
 }
 
 func compareAttrAndType(key []byte, attr string, typ byte) bool {
@@ -494,7 +491,8 @@ func rebuildCountIndex(ctx context.Context, attr string, reverse bool, errCh cha
 		prefix = pk.ReversePrefix()
 	}
 
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 		iterItem := it.Item()
@@ -557,7 +555,8 @@ func RebuildReverseEdges(ctx context.Context, attr string) error {
 	// Add index entries to data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.DataPrefix()
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 
 	// Helper function - Add reverse entries for values in posting list
@@ -657,7 +656,8 @@ func RebuildIndex(ctx context.Context, attr string) error {
 	// Add index entries to data store.
 	pk := x.ParsedKey{Attr: attr}
 	prefix := pk.DataPrefix()
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 
 	// Helper function - Add index entries for values in posting list

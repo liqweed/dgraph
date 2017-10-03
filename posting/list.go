@@ -162,11 +162,13 @@ func getNew(key []byte, pstore *badger.KV) *List {
 	var err error
 	for i := 0; i < 10; i++ {
 		x.PostingReads.Add(1)
-		if err = pstore.Get(l.key, &item); err == nil {
+		txn := pstore.NewTransaction(false)
+		item, err = txn.Get(l.key)
+		if err == nil || err == badger.ErrKeyNotFound {
 			break
 		}
 	}
-	if err != nil {
+	if err != nil && err != badger.ErrKeyNotFound {
 		x.Fatalf("Unable to retrieve val for key: %q. Error: %v", err, l.key)
 	}
 	l.plist = new(protos.PostingList)
@@ -620,15 +622,17 @@ func (l *List) Length(afterUid uint64) int {
 }
 
 func doAsyncWrite(key []byte, data []byte, uidOnlyPosting bool, f func(error)) {
+	txn := pstore.NewTransaction(true)
 	var meta byte
 	if uidOnlyPosting {
 		meta = bitUidPostings
 	}
 	if data == nil {
-		pstore.DeleteAsync(key, f)
+		txn.Delete(key)
 	} else {
-		pstore.SetAsync(key, data, meta, f)
+		txn.Set(key, data, meta)
 	}
+	txn.Commit(f)
 }
 
 func (l *List) SyncIfDirty(delFromCache bool) (committed bool, err error) {

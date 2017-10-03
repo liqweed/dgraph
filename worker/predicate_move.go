@@ -42,25 +42,12 @@ func populateKeyValues(ctx context.Context, kvs []*protos.KV) error {
 	// single tablet.
 	groups().waitForBackgroundDeletion()
 	x.Printf("Writing %d keys\n", len(kvs))
-	wb := make([]*badger.Entry, 0, 1000)
+	txn := pstore.NewTransaction(true)
 	// Badger does batching internally so no need to batch it.
 	for _, kv := range kvs {
-		entry := &badger.Entry{
-			Key:      kv.Key,
-			Value:    kv.Val,
-			UserMeta: kv.UserMeta[0],
-		}
-		wb = append(wb, entry)
+		txn.Set(kv.Key, kv.Val, kv.UserMeta[0])
 	}
-	if err := pstore.BatchSet(wb); err != nil {
-		return err
-	}
-	for _, wbe := range wb {
-		if err := wbe.Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return txn.Commit(nil)
 }
 
 func movePredicateHelper(ctx context.Context, predicate string, gid uint32) error {
@@ -78,6 +65,9 @@ func movePredicateHelper(ctx context.Context, predicate string, gid uint32) erro
 	sendItem := func(stream protos.Worker_ReceivePredicateClient, item *badger.KVItem) error {
 		kv := &protos.KV{}
 		key := item.Key()
+		if len(key) == 0 {
+			return nil
+		}
 		kv.Key = make([]byte, len(key))
 		copy(kv.Key, key)
 		kv.UserMeta = []byte{item.UserMeta()}
@@ -94,7 +84,8 @@ func movePredicateHelper(ctx context.Context, predicate string, gid uint32) erro
 	}
 
 	// sends all data except schema, schema key has different prefix
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 	prefix := x.PredicatePrefix(predicate)
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
@@ -106,8 +97,8 @@ func movePredicateHelper(ctx context.Context, predicate string, gid uint32) erro
 	}
 
 	// send schema
-	var item badger.KVItem
-	if err := pstore.Get(x.SchemaKey(predicate), &item); err != nil {
+	item, err := txn.Get(x.SchemaKey(predicate))
+	if err != nil && err != badger.ErrKeyNotFound {
 		return err
 	}
 	if err := sendItem(stream, &item); err != nil {

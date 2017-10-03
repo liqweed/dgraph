@@ -267,7 +267,8 @@ func export(bdir string) error {
 	}()
 
 	// Iterate over key-value store
-	it := pstore.NewIterator(badger.DefaultIteratorOptions)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(badger.DefaultIteratorOptions)
 	defer it.Close()
 	prefix := new(bytes.Buffer)
 	prefix.Grow(100)

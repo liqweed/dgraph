@@ -212,7 +212,8 @@ func updateSchemaType(attr string, typ types.TypeID, raftIndex uint64, group uin
 func numEdges(attr string) int {
 	iterOpt := badger.DefaultIteratorOptions
 	iterOpt.PrefetchValues = false
-	it := pstore.NewIterator(iterOpt)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(iterOpt)
 	defer it.Close()
 	pk := x.ParsedKey{
 		Attr: attr,
@@ -228,7 +229,8 @@ func numEdges(attr string) int {
 func hasEdges(attr string) bool {
 	iterOpt := badger.DefaultIteratorOptions
 	iterOpt.PrefetchValues = false
-	it := pstore.NewIterator(iterOpt)
+	txn := pstore.NewTransaction(false)
+	it := txn.NewIterator(iterOpt)
 	defer it.Close()
 	pk := x.ParsedKey{
 		Attr: attr,
