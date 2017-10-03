@@ -384,7 +384,7 @@ func deleteEntries(prefix []byte) error {
 	iterOpt := badger.DefaultIteratorOptions
 	iterOpt.PrefetchValues = false
 	txn := pstore.NewTransaction(false)
-	txn1 := pstore.NewTransaction(false)
+	txn1 := pstore.NewTransaction(true)
 	idxIt := txn.NewIterator(iterOpt)
 	defer idxIt.Close()
 
@@ -398,14 +398,14 @@ func deleteEntries(prefix []byte) error {
 		x.Check(err)
 
 		if batchSize >= maxBatchSize {
-			if err := txn.Commit(nil); err != nil {
+			if err := txn1.Commit(nil); err != nil {
 				return err
 			}
 			txn1 = pstore.NewTransaction(true)
 			batchSize = 0
 		}
 	}
-	return txn.Commit(nil)
+	return txn1.Commit(nil)
 }
 
 func compareAttrAndType(key []byte, attr string, typ byte) bool {
